@@ -1065,6 +1065,12 @@
 
   function saveLast() {
     if (!session || session.exam || session.review) return;
+    const answered = Object.keys(session.answers)
+      .filter((id) => session.answers[id] && session.answers[id].choice).length;
+    if (!answered && session.index === 0) {
+      if (store.last) { store.last = null; save(); }
+      return;
+    }
     store.last = {
       mode: session.mode,
       title: session.title,
