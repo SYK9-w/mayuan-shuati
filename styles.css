@@ -932,6 +932,31 @@ a { color: var(--primary); }
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.ph-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 1px;
+}
+.ph-arrow {
+  width: 30px;
+  height: 24px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+.ph-arrow:active:not(:disabled) { background: var(--surface-3); color: var(--text); }
+.ph-arrow:disabled { opacity: 0.28; }
+.ph-title #ph-progress {
+  display: inline-block;
+  margin-top: 0;
+  min-width: 48px;
+  text-align: center;
+}
 .progress-line {
   height: 3px;
   margin: 4px 8px 0;
@@ -982,8 +1007,9 @@ a { color: var(--primary); }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 18px 20px calc(128px + var(--safe-bottom));
-  scroll-behavior: smooth;
 }
+.practice-body.q-slide-next { animation: qSlideNext 0.16s ease both; }
+.practice-body.q-slide-prev { animation: qSlidePrev 0.16s ease both; }
 .q-meta {
   display: flex;
   align-items: center;
@@ -1433,6 +1459,8 @@ a { color: var(--primary); }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes tabIn { from { opacity: 0.55; } to { opacity: 1; } }
 @keyframes practiceIn { from { opacity: 0.6; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes qSlideNext { from { opacity: 0.55; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes qSlidePrev { from { opacity: 0.55; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
 @keyframes slideUp { from { transform: translate(-50%, 30px); opacity: 0.6; } to { transform: translate(-50%, 0); opacity: 1; } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes modalIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }

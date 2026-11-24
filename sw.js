@@ -1,5 +1,5 @@
 /* 马原刷题 service worker — offline app shell, network-first for fresh updates */
-const VERSION = 'msx-v1.0.3';
+const VERSION = 'msx-v1.0.4';
 const ASSETS = [
   './',
   './index.html',

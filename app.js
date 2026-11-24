@@ -17,7 +17,7 @@
   QS.forEach((q) => BY_CH[q.c].push(q));
 
   const LS_KEY = 'msx.v1';
-  const DEFAULT_SETTINGS = { theme: 'auto', font: 17, autoNext: true };
+  const DEFAULT_SETTINGS = { theme: 'auto', font: 17, autoNext: true, swipeTip: false };
   const CARD_LETTERS = ['A', 'B', 'C', 'D'];
   const media = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -754,6 +754,8 @@
   let session = null;
   let timerId = null;
   let currentResult = null;
+  let touchStart = null;
+  let suppressClickUntil = 0;
 
   function clearTimer() {
     if (timerId) { clearInterval(timerId); timerId = null; }
@@ -797,6 +799,11 @@
     $('#practice').scrollTop = 0;
     renderQuestion();
     if (session.exam) startTimer();
+    if (!store.settings.swipeTip) {
+      store.settings.swipeTip = true;
+      save();
+      setTimeout(() => toast('左右滑动可切换上一题 / 下一题'), 800);
+    }
   }
 
   function practiceSkeleton() {
@@ -804,7 +811,14 @@
       <header class="practice-head">
         <div class="ph-row">
           <button class="icon-btn" data-act="exit" aria-label="退出">${icon('chevronLeft', 25)}</button>
-          <div class="ph-title"><b>${esc(session.title)}</b><span id="ph-progress"></span></div>
+          <div class="ph-title">
+            <b>${esc(session.title)}</b>
+            <div class="ph-nav">
+              <button class="ph-arrow" data-act="prev" aria-label="上一题" title="上一题">${icon('chevronLeft', 14)}</button>
+              <span id="ph-progress"></span>
+              <button class="ph-arrow" data-act="next" aria-label="下一题" title="下一题">${icon('chevronRight', 14)}</button>
+            </div>
+          </div>
           <button class="icon-btn star ${isFav(session.ids[session.index]) ? 'on' : ''}" data-act="fav" aria-label="收藏">${icon('star', 21)}</button>
           <button class="icon-btn" data-act="card" aria-label="答题卡">${icon('grid', 20)}</button>
         </div>
@@ -827,6 +841,8 @@
     if (titleEl) titleEl.textContent = session.title;
     const prog = $('#ph-progress');
     if (prog) prog.textContent = `${session.index + 1} / ${session.ids.length}`;
+    const prevBtn = $('.ph-nav [data-act="prev"]');
+    if (prevBtn) prevBtn.disabled = session.index === 0;
     const bar = $('#ph-bar');
     if (bar) bar.style.width = `${((session.index + 1) / session.ids.length) * 100}%`;
     const favBtn = $('[data-act="fav"]');
@@ -918,13 +934,18 @@
     </div>`;
   }
 
-  function renderQuestion() {
+  function renderQuestion(dir) {
     if (!session) return;
     updateHeader();
     const body = $('#practice-body');
     const q = currentQ();
+    body.classList.remove('q-slide-next', 'q-slide-prev');
     body.innerHTML = bodyHTML(q);
     body.scrollTop = 0;
+    if (dir) {
+      void body.offsetWidth;
+      body.classList.add(dir === 'next' ? 'q-slide-next' : 'q-slide-prev');
+    }
     renderFooter();
     if (!session.exam && !session.review) saveLast();
   }
@@ -1079,13 +1100,13 @@
       return;
     }
     session.index++;
-    renderQuestion();
+    renderQuestion('next');
   }
 
   function prevQuestion() {
     if (!session || session.index === 0) return;
     session.index--;
-    renderQuestion();
+    renderQuestion('prev');
   }
 
   function closeSession() {
@@ -1725,7 +1746,45 @@
   /* ------------------------------------------------------------
      global events
      ------------------------------------------------------------ */
+  document.addEventListener('touchstart', (e) => {
+    if (!session || e.touches.length !== 1) return;
+    if (!e.target.closest('#practice-body')) return;
+    const t = e.touches[0];
+    if (t.clientX < 26 || t.clientX > window.innerWidth - 26) return;
+    touchStart = { x: t.clientX, y: t.clientY, t: Date.now() };
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!touchStart || !session) { touchStart = null; return; }
+    const start = touchStart;
+    touchStart = null;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const dt = Date.now() - start.t;
+    if (dt > 900 || Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+    if (document.querySelector('#overlay-root .sheet, #overlay-root .modal')) return;
+
+    suppressClickUntil = Date.now() + 450;
+    if (dx < 0) {
+      if (session.index < session.ids.length - 1) nextQuestion('next');
+      else toast('已经是最后一题');
+    } else if (session.index > 0) {
+      prevQuestion('prev');
+    } else {
+      toast('已经是第一题');
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchcancel', () => { touchStart = null; }, { passive: true });
+
   document.addEventListener('click', (e) => {
+    if (Date.now() < suppressClickUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (e.target.classList.contains('backdrop')) { closeOverlay(); return; }
     if (e.target.classList.contains('modal')) { closeModal(); return; }
 
