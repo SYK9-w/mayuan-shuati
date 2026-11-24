@@ -297,7 +297,11 @@
   /* ------------------------------------------------------------
      navigation
      ------------------------------------------------------------ */
-  const state = { tab: 'home', wrongFilter: 'all' };
+  const state = {
+    tab: 'home',
+    wrongFilter: 'all',
+    scroll: { home: 0, wrong: 0, fav: 0, me: 0 },
+  };
   const TABS = [
     { id: 'home', label: '首页', icon: 'home' },
     { id: 'wrong', label: '错题', icon: 'book' },
@@ -307,26 +311,50 @@
 
   function renderTabbar() {
     $('#tabbar').innerHTML = TABS.map((t) => `
-      <button class="tab-item ${state.tab === t.id ? 'active' : ''}" data-tab="${t.id}" aria-label="${t.label}">
+      <button class="tab-item" data-tab="${t.id}" aria-label="${t.label}">
         <span class="tab-icon-wrap">${icon(t.icon, 23)}</span>
         <span>${t.label}</span>
       </button>`).join('');
+    updateTabbar();
   }
 
-  function switchTab(tab) {
+  function updateTabbar() {
+    $$('#tabbar .tab-item').forEach((el) => {
+      const on = el.dataset.tab === state.tab;
+      el.classList.toggle('active', on);
+      if (on) el.setAttribute('aria-current', 'page');
+      else el.removeAttribute('aria-current');
+    });
+  }
+
+  function switchTab(tab, opts = {}) {
+    if (tab === state.tab) {
+      if (opts.top !== false) window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!document.body.classList.contains('practice-open')) {
+      state.scroll[state.tab] = window.scrollY;
+    }
     state.tab = tab;
-    renderTab();
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    renderTab({ animate: true, restore: true });
   }
 
-  function renderTab() {
+  function renderTab(opts = {}) {
     const view = $('#view');
+    if (!opts.restore && !document.body.classList.contains('practice-open')) {
+      state.scroll[state.tab] = window.scrollY;
+    }
     view.dataset.screen = state.tab;
-    if (state.tab === 'home') view.innerHTML = homeHTML();
-    else if (state.tab === 'wrong') view.innerHTML = wrongHTML();
-    else if (state.tab === 'fav') view.innerHTML = favHTML();
-    else view.innerHTML = meHTML();
-    renderTabbar();
+    let html;
+    if (state.tab === 'home') html = homeHTML();
+    else if (state.tab === 'wrong') html = wrongHTML();
+    else if (state.tab === 'fav') html = favHTML();
+    else html = meHTML();
+    view.innerHTML = `<div class="tab-page">${html}</div>`;
+    updateTabbar();
+    const page = $('.tab-page', view);
+    if (opts.animate && page) page.classList.add('enter');
+    window.scrollTo(0, opts.top ? 0 : (state.scroll[state.tab] || 0));
   }
 
   /* ------------------------------------------------------------
@@ -397,7 +425,7 @@
     const acc = t.a ? Math.round((t.c / t.a) * 100) : 0;
     const st = streak();
     const wc = wrongCounts();
-    const wrongSub = wc.todo ? `${wc.todo} 题待巩固` : wc.all ? `${wc.all} 题均已掌握` : '暂无错题';
+    const wrongSub = wc.todo ? `待巩固 ${wc.todo}题` : wc.all ? `已掌握 ${wc.all}题` : '暂无错题';
     const total = DATA.meta.count;
 
     return `
@@ -420,9 +448,9 @@
 
     <h2 class="section-title">快速开始</h2>
     <div class="quick-grid">
-      ${quickItem('seq', 'list', 'violet', '顺序练习', `${total} 题 · 按章节顺序`)}
-      ${quickItem('random', 'shuffle', 'teal', '随机练习', '随机抽 30 题')}
-      ${quickItem('exam', 'clock', 'amber', '模拟考试', '100 题 · 90 分钟')}
+      ${quickItem('seq', 'list', 'violet', '顺序练习', `全部 ${total} 题`)}
+      ${quickItem('random', 'shuffle', 'teal', '随机练习', '随机 30 题')}
+      ${quickItem('exam', 'clock', 'amber', '模拟考试', '100题 · 90分')}
       ${quickItem('wrong', 'target', 'red', '错题重做', wrongSub)}
     </div>
 
@@ -726,6 +754,9 @@
   function openSession(opts) {
     clearTimer();
     closeOverlay();
+    if (!document.body.classList.contains('practice-open')) {
+      state.scroll[state.tab] = window.scrollY;
+    }
     const ids = (opts.ids || []).filter((id) => QMAP.has(id));
     if (!ids.length) { toast('这里还没有题目'); return; }
 
@@ -1033,7 +1064,7 @@
     currentResult = null;
     $('#practice-root').innerHTML = '';
     document.body.classList.remove('practice-open');
-    renderTab();
+    renderTab({ restore: true });
   }
 
   function requestExit() {
@@ -1439,8 +1470,8 @@
     $('#practice-root').innerHTML = '';
     document.body.classList.remove('practice-open');
     state.tab = 'home';
-    renderTab();
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    state.scroll.home = 0;
+    renderTab({ restore: true, top: true, animate: true });
   }
 
   /* ------------------------------------------------------------
@@ -1525,7 +1556,8 @@
         $('#practice-root').innerHTML = '';
         document.body.classList.remove('practice-open');
         state.tab = 'home';
-        renderTab();
+        state.scroll.home = 0;
+        renderTab({ restore: true, top: true });
         toast('学习数据已清除');
       },
     });

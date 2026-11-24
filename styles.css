@@ -124,6 +124,8 @@ a { color: var(--primary); }
   padding: calc(var(--safe-top) + 20px) 20px calc(var(--safe-bottom) + 104px);
   min-height: 100dvh;
 }
+.tab-page { min-height: 60vh; }
+.tab-page.enter { animation: tabIn 0.24s cubic-bezier(.22, 1, .36, 1) both; }
 
 /* ---------- icons ---------- */
 .ic { display: block; }
@@ -133,7 +135,7 @@ a { color: var(--primary); }
   position: fixed;
   left: 50%;
   bottom: 0;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateZ(0);
   z-index: 30;
   width: 100%;
   max-width: 560px;
@@ -141,12 +143,13 @@ a { color: var(--primary); }
   align-items: stretch;
   justify-content: space-around;
   padding: 7px 10px calc(var(--safe-bottom) + 7px);
-  background: rgba(248, 248, 252, 0.80);
+  background: rgba(248, 248, 252, 0.92);
   border-top: 1px solid var(--line);
   -webkit-backdrop-filter: saturate(200%) blur(22px);
   backdrop-filter: saturate(200%) blur(22px);
+  will-change: transform;
 }
-[data-theme="dark"] .tabbar { background: rgba(12, 12, 18, 0.80); }
+[data-theme="dark"] .tabbar { background: rgba(12, 12, 18, 0.92); }
 
 .tab-item {
   flex: 1;
@@ -159,7 +162,7 @@ a { color: var(--primary); }
   font-weight: 600;
   letter-spacing: 0.02em;
   padding: 2px 0;
-  transition: color 0.18s ease;
+  transition: color 0.18s ease, opacity 0.12s ease;
 }
 .tab-icon-wrap {
   width: 46px;
@@ -167,11 +170,11 @@ a { color: var(--primary); }
   border-radius: 14px;
   display: grid;
   place-items: center;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease;
 }
 .tab-item.active { color: var(--primary); }
 .tab-item.active .tab-icon-wrap { background: var(--primary-soft); }
-.tab-item:active .tab-icon-wrap { transform: scale(0.94); }
+.tab-item:active { opacity: 0.62; }
 
 /* ---------- shared ---------- */
 .kicker {
@@ -411,14 +414,16 @@ a { color: var(--primary); }
 
 .quick-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 .quick {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 14px;
+  gap: 10px;
+  min-width: 0;
+  min-height: 70px;
+  padding: 13px;
   border-radius: 20px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -838,6 +843,7 @@ a { color: var(--primary); }
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  animation: practiceIn 0.26s cubic-bezier(.22, 1, .36, 1) both;
 }
 [data-theme="dark"] .practice { background: radial-gradient(800px 400px at 50% -10%, rgba(124,92,246,0.12), transparent 60%), var(--bg); }
 
@@ -1355,6 +1361,8 @@ a { color: var(--primary); }
 
 /* ---------- animations ---------- */
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tabIn { from { opacity: 0.55; } to { opacity: 1; } }
+@keyframes practiceIn { from { opacity: 0.6; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes slideUp { from { transform: translate(-50%, 30px); opacity: 0.6; } to { transform: translate(-50%, 0); opacity: 1; } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes modalIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
