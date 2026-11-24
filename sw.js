@@ -1,5 +1,5 @@
-/* 马原刷题 service worker — offline app shell */
-const VERSION = 'msx-v1.0.2';
+/* 马原刷题 service worker — offline app shell, network-first for fresh updates */
+const VERSION = 'msx-v1.0.3';
 const ASSETS = [
   './',
   './index.html',
@@ -33,17 +33,36 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  // HTML/JS/CSS: try the network first so a normal refresh picks up new builds.
+  const shell = req.mode === 'navigate' || /\.(?:js|css|webmanifest)$/.test(url.pathname);
+  if (shell) {
+    event.respondWith((async () => {
+      try {
+        const res = await fetch(req);
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(VERSION).then((c) => c.put(req, copy));
+        }
+        return res;
+      } catch (e) {
+        const cached = await caches.match(req, { ignoreSearch: true });
+        return cached || (await caches.match('./index.html'));
+      }
+    })());
+    return;
+  }
+
+  // Images and other static assets: cache-first, refresh in the background.
   event.respondWith(
     caches.match(req, { ignoreSearch: true }).then((cached) => {
       if (cached) {
-        // Refresh the shell in the background so updates land next launch.
         fetch(req).then((res) => {
           if (res && res.ok) caches.open(VERSION).then((c) => c.put(req, res.clone()));
         }).catch(() => {});
         return cached;
       }
       return fetch(req).then((res) => {
-        if (res && res.ok && (req.destination === 'document' || url.pathname.endsWith('.js') || url.pathname.endsWith('.css'))) {
+        if (res && res.ok) {
           const copy = res.clone();
           caches.open(VERSION).then((c) => c.put(req, copy));
         }

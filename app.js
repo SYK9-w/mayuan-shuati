@@ -454,6 +454,13 @@
       ${quickItem('wrong', 'target', 'red', '错题重做', wrongSub)}
     </div>
 
+    <button class="learn-card" data-act="start-learn">
+      <span class="learn-icon">${icon('book', 21)}</span>
+      <span class="learn-text"><b>背题模式</b><span>直接显示答案，适合考前速记</span></span>
+      <span class="learn-chip">无需作答</span>
+      ${icon('chevronRight', 17, 'chev')}
+    </button>
+
     <div class="section-head">
       <h2>章节练习</h2>
       <span>共 ${total} 题</span>
@@ -732,6 +739,11 @@
             <span class="sa-text"><b>本章随机练习</b><span>打乱顺序，抽 ${Math.min(20, qs.length)} 题</span></span>
             ${icon('chevronRight', 17, 'sa-arrow')}
           </button>
+          <button class="sheet-action" data-act="start-chapter-learn" data-c="${i}">
+            <span class="sa-icon amber">${icon('book', 19)}</span>
+            <span class="sa-text"><b>背题模式</b><span>直接看答案，本章 ${qs.length} 题</span></span>
+            ${icon('chevronRight', 17, 'sa-arrow')}
+          </button>
         </div>
       </div>`);
   }
@@ -768,6 +780,7 @@
       answers: opts.answers ? JSON.parse(JSON.stringify(opts.answers)) : {},
       exam: !!opts.exam,
       review: !!opts.review,
+      learn: !!opts.learn,
       submitted: false,
       duration: opts.duration || 0,
       startAt: opts.startAt || Date.now(),
@@ -842,28 +855,49 @@
   }
 
   function bodyHTML(q) {
-    const a = session.answers[q.id];
-    const checked = !!(a && typeof a.ok === 'boolean');
+    const learn = !!session.learn;
+    const a = learn ? null : session.answers[q.id];
+    const checked = !learn && !!(a && typeof a.ok === 'boolean');
+    const canEnterLearn = !learn && !session.exam && !session.review;
     return `
       <div class="q-meta">
         <span class="pill ${q.t === 'm' ? 'pill-multi' : ''}">${q.t === 's' ? '单选题' : '多选题'}</span>
+        ${learn ? '<span class="pill pill-learn">背题模式</span>' : ''}
         <span class="q-chapter">${esc(chLabel(CH[q.c]))}</span>
+        ${canEnterLearn ? `<button class="q-learn" data-act="learn-toggle">${icon('book', 13)} 背题</button>` : ''}
       </div>
       <h2 class="stem">${esc(q.q)}</h2>
       <div class="options" id="options">
         ${q.o.map((text, idx) => {
           const label = CARD_LETTERS[idx];
-          const cls = optionClass(q, label, a);
+          const isAnswer = learn && q.a.includes(label);
+          const cls = learn ? (isAnswer ? 'learn-correct' : '') : optionClass(q, label, a);
           const sel = a && (a.choice || '').includes(label);
-          return `<button class="option ${cls}" data-opt="${label}" aria-pressed="${sel ? 'true' : 'false'}" aria-disabled="${checked ? 'true' : 'false'}">
+          return `<button class="option ${cls}" data-opt="${label}" aria-pressed="${sel ? 'true' : 'false'}" aria-disabled="${checked || learn ? 'true' : 'false'}">
             <span class="opt-key">${label}</span>
             <span class="opt-text">${esc(text)}</span>
-            <span class="opt-mark">${markHTML(q, label, a)}</span>
+            <span class="opt-mark">${learn ? (isAnswer ? icon('check', 17) : '') : markHTML(q, label, a)}</span>
           </button>`;
         }).join('')}
       </div>
-      <div id="answer-slot">${checked ? explanationHTML(q, a) : ''}</div>
-      <p class="q-footer-note">题库第 ${q.n} 题 · 共 ${DATA.meta.count} 题</p>`;
+      <div id="answer-slot">${learn ? learnHTML(q) : checked ? explanationHTML(q, a) : ''}</div>
+      <p class="q-footer-note">${learn ? '背题模式 · 不记录作答' : `题库第 ${q.n} 题 · 共 ${DATA.meta.count} 题`}</p>`;
+  }
+
+  function learnHTML(q) {
+    return `<div class="explain ok learn">
+      <div class="explain-head">
+        <span class="explain-icon">${icon('book', 15)}</span>
+        <b>参考答案</b>
+        <span class="explain-answer">正确答案 ${q.a.split('').join(' ')}</span>
+      </div>
+      <div class="explain-grid">
+        <div><span>题型</span><b>${q.t === 's' ? '单选' : '多选'}</b></div>
+        <div><span>所属章节</span><b class="small">${esc(CH[q.c].name)}</b></div>
+      </div>
+      <p class="explain-tip">背题模式：不用作答，直接看答案。不会记录正确率，也不会改变错题本。</p>
+      <p class="explain-note">原题库未收录文字解析，建议结合《${esc(CH[q.c].name)} ${esc(CH[q.c].title)}》教材复习。</p>
+    </div>`;
   }
 
   function explanationHTML(q, a) {
@@ -1138,6 +1172,49 @@
     const qs = BY_CH[i];
     const ids = shuffle(qs).slice(0, Math.min(20, qs.length)).map((q) => q.id);
     openSession({ mode: 'random', title: `${CH[i].name} · 随机练习`, ids, c: i });
+  }
+
+  function startLearnAll() {
+    const ids = QS.map((q) => q.id);
+    let start = QS.findIndex((q) => !store.progress[q.id]);
+    if (start < 0) start = 0;
+    openSession({
+      mode: 'learn',
+      title: '背题模式 · 全部题库',
+      ids,
+      index: start,
+      review: true,
+      learn: true,
+    });
+  }
+
+  function startLearnChapter(i) {
+    const qs = BY_CH[i];
+    let start = qs.findIndex((q) => !store.progress[q.id]);
+    if (start < 0) start = 0;
+    openSession({
+      mode: 'learn',
+      title: `${CH[i].name} · 背题模式`,
+      ids: qs.map((q) => q.id),
+      index: start,
+      review: true,
+      learn: true,
+    });
+  }
+
+  function enterLearn() {
+    if (!session) return;
+    if (session.learn) { toast('已经在背题模式'); return; }
+    if (session.exam) { toast('考试中不能切换背题模式'); return; }
+    if (session.review) { toast('解析模式不能切换'); return; }
+    openSession({
+      mode: 'learn',
+      title: `${session.title} · 背题`,
+      ids: session.ids,
+      index: session.index,
+      review: true,
+      learn: true,
+    });
   }
 
   function startSequential() {
@@ -1494,21 +1571,23 @@
       return `<button class="ans-cell ${cls}" data-act="jump" data-i="${i}">${i + 1}</button>`;
     }).join('');
 
-    const legend = session.exam
-      ? `<span><i class="legend-dot done"></i>已答 ${answered}</span><span><i class="legend-dot"></i>未答 ${ids.length - answered}</span>`
-      : `<span><i class="legend-dot ok"></i>正确 ${ok}</span><span><i class="legend-dot bad"></i>错误 ${bad}</span><span><i class="legend-dot"></i>未答 ${ids.length - answered}</span>`;
+    const legend = session.learn
+      ? `<span><i class="legend-dot"></i>背题模式 · 点击题号跳转</span>`
+      : session.exam
+        ? `<span><i class="legend-dot done"></i>已答 ${answered}</span><span><i class="legend-dot"></i>未答 ${ids.length - answered}</span>`
+        : `<span><i class="legend-dot ok"></i>正确 ${ok}</span><span><i class="legend-dot bad"></i>错误 ${bad}</span><span><i class="legend-dot"></i>未答 ${ids.length - answered}</span>`;
 
     mountOverlay(`
       <div class="backdrop"></div>
       <div class="sheet" role="dialog" aria-modal="true">
         <div class="sheet-handle"></div>
         <h2>答题卡</h2>
-        <p class="sheet-sub">${session.exam ? '点击题号可跳转，交卷后统一判分。' : '点击题号可跳转。'}</p>
+        <p class="sheet-sub">${session.learn ? '背题模式不记录作答，点击题号可跳转。' : session.exam ? '点击题号可跳转，交卷后统一判分。' : '点击题号可跳转。'}</p>
         <div class="answer-legend">${legend}</div>
         <div class="answer-grid">${cells}</div>
         ${session.exam
           ? `<button class="btn btn-primary btn-block" data-act="submit" style="width:100%">交卷</button>`
-          : `<button class="btn btn-secondary btn-block" data-act="close-sheet" style="width:100%">继续答题</button>`}
+          : `<button class="btn btn-secondary btn-block" data-act="close-sheet" style="width:100%">${session.learn ? '继续背题' : '继续答题'}</button>`}
       </div>`);
   }
 
@@ -1609,6 +1688,9 @@
       case 'open-chapter': openChapterSheet(Number(el.dataset.c)); break;
       case 'start-chapter': closeOverlay(); startChapter(Number(el.dataset.c), el.dataset.t); break;
       case 'start-chapter-random': closeOverlay(); startChapterRandom(Number(el.dataset.c)); break;
+      case 'start-learn': startLearnAll(); break;
+      case 'start-chapter-learn': closeOverlay(); startLearnChapter(Number(el.dataset.c)); break;
+      case 'learn-toggle': enterLearn(); break;
       case 'exit': requestExit(); break;
       case 'card': openAnswerCard(); break;
       case 'fav': toggleFav(currentQ() && currentQ().id); break;
@@ -1679,11 +1761,25 @@
   /* ------------------------------------------------------------
      service worker
      ------------------------------------------------------------ */
+  let swReloading = false;
+
   function registerSW() {
     if (!('serviceWorker' in navigator)) return;
     const ok = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     if (!ok) return;
-    navigator.serviceWorker.register('./sw.js').catch(() => { /* offline unavailable */ });
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || swReloading) return;
+      if (session && session.exam && !session.submitted) {
+        toast('新版本已就绪，交卷后刷新即可');
+        return;
+      }
+      swReloading = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .then((reg) => reg.update().catch(() => {}))
+      .catch(() => { /* offline unavailable */ });
   }
 
   /* ------------------------------------------------------------
